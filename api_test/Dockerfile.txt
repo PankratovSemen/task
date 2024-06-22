@@ -1,0 +1,25 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder 
+# укажем директорию для нашего приложения внутри контейнера
+WORKDIR /Application
+
+# Скопируем все файлы из проекта в файловую систему контейнера
+COPY ./*.csproj .
+# Запустим restore для загрузки зависимостей
+RUN dotnet restore
+# Опубликуем собранный dll в папку "output"
+COPY . .
+RUN dotnet publish -c Debug -o output
+
+# Теперь соберём образ, в котором наше приложение 
+# будет запущено. Для запуска приложения достаточно
+# среды выполнения aspnet, без sdk
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+RUN apt-get update
+RUN apt-get install -y nginx
+COPY nginx/default.conf /etc/nginx/sites-enabled/default
+WORKDIR /Application
+# Скопируем файлы приложения из предыдущего образа 
+COPY --from=builder /Application/output .
+ENV ASPNETCORE_URLS=http://+:5002
+
+CMD ["/bin/bash", "-c", "service nginx start && dotnet DeliveryEat_vue1.Server.dll"]
